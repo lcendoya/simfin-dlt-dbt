@@ -1,0 +1,92 @@
+version: 2
+
+models:
+  - name: stg_price_data
+    description: "Staged and cleaned price data from the API"
+    columns:
+      - name: ticker
+        description: "Stock ticker symbol"
+        tests:
+          - not_null
+      - name: date
+        description: "Trading date"
+        tests:
+          - not_null
+      - name: adjusted_closing_price
+        description: "Adjusted closing price"
+        tests:
+          - not_null
+          - positive_values
+
+  - name: int_sma_indicators
+    description: "Simple Moving Average indicators for various periods (intermediate layer)"
+    columns:
+      - name: sma_20
+        description: "20-period Simple Moving Average"
+        tests:
+          - not_null
+
+  - name: int_ema_indicators
+    description: "Exponential Moving Average indicators for various periods (intermediate layer)"
+    columns:
+      - name: ema_20
+        description: "20-period Exponential Moving Average"
+        tests:
+          - not_null
+
+  - name: int_rsi_indicators
+    description: "Relative Strength Index indicators for various periods (intermediate layer)"
+    columns:
+      - name: rsi_14
+        description: "14-period RSI"
+        tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+
+  - name: int_macd_indicators
+    description: "MACD line, signal line, and histogram (intermediate layer)"
+    columns:
+      - name: macd_line
+        description: "MACD line (12-period EMA - 26-period EMA)"
+        tests:
+          - not_null
+
+  - name: int_bollinger_bands
+    description: "Bollinger Bands with upper, middle, and lower bands (intermediate layer)"
+    columns:
+      - name: bb_upper_20
+        description: "Upper Bollinger Band (20-period SMA + 2 standard deviations)"
+        tests:
+          - not_null
+
+  - name: int_vwap_indicators
+    description: "Volume Weighted Average Price indicators (intermediate layer)"
+    columns:
+      - name: vwap_20
+        description: "20-period VWAP"
+        tests:
+          - not_null
+
+  - name: consolidated_indicators
+    description: "Complete technical analysis table with all indicators combined (incremental materialization)"
+    columns:
+      - name: ticker
+        description: "Stock ticker symbol"
+        tests:
+          - not_null
+      - name: date
+        description: "Trading date"
+        tests:
+          - not_null
+      - name: rsi_signal
+        description: "RSI signal (Overbought/Oversold/Neutral)"
+        tests:
+          - accepted_values:
+              values: ['Overbought', 'Oversold', 'Neutral']
+      - name: macd_signal
+        description: "MACD signal (Bullish/Bearish/Neutral)"
+        tests:
+          - accepted_values:
+              values: ['Bullish', 'Bearish', 'Neutral']

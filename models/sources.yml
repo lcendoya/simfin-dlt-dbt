@@ -1,0 +1,59 @@
+version: 2
+
+sources:
+  - name: simfin_raw
+    description: "Raw data loaded from SimFin API via dlt"
+    tables:
+      - name: price
+        description: "Raw price data from SimFin API"
+        columns:
+          - name: company_id
+            description: "Unique identifier for the company"
+            tests:
+              - not_null
+          - name: company_name
+            description: "Name of the company"
+            tests:
+              - not_null
+          - name: ticker
+            description: "Stock ticker symbol"
+            tests:
+              - not_null
+          - name: currency
+            description: "Currency of the price data"
+            tests:
+              - not_null
+          - name: isin
+            description: "International Securities Identification Number"
+          - name: date
+            description: "Trading date"
+            tests:
+              - not_null
+          - name: dividend_paid
+            description: "Dividend paid on this date"
+          - name: common_shares_outstanding
+            description: "Number of common shares outstanding"
+          - name: last_closing_price
+            description: "Last closing price"
+            tests:
+              - not_null
+          - name: adjusted_closing_price
+            description: "Adjusted closing price"
+            tests:
+              - not_null
+          - name: highest_price
+            description: "Highest price during the trading day"
+            tests:
+              - not_null
+          - name: lowest_price
+            description: "Lowest price during the trading day"
+            tests:
+              - not_null
+          - name: opening_price
+            description: "Opening price"
+            tests:
+              - not_null
+          - name: trading_volume
+            description: "Trading volume"
+            tests:
+              - not_null
