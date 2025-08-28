@@ -1,48 +1,35 @@
 -- Simple Moving Average (SMA) indicators
 -- Intermediate layer: Business logic and calculations
+-- Only calculates SMA periods actually used in IndicatorData.py
 
 SELECT 
     *,
-    -- 5-day SMA
+    -- 9-day SMA: Used in MACDEXT signal line
     AVG(adjusted_closing_price) OVER (
         PARTITION BY ticker 
         ORDER BY date 
-        ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
-    ) as sma_5,
+        ROWS BETWEEN 8 PRECEDING AND CURRENT ROW
+    ) as sma_9,
     
-    -- 10-day SMA
+    -- 12-day SMA: Used in MACDEXT fast period
     AVG(adjusted_closing_price) OVER (
         PARTITION BY ticker 
         ORDER BY date 
-        ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-    ) as sma_10,
+        ROWS BETWEEN 11 PRECEDING AND CURRENT ROW
+    ) as sma_12,
     
-    -- 20-day SMA (commonly used)
+    -- 20-day SMA: Used in Bollinger Bands and main SMA calculation
     AVG(adjusted_closing_price) OVER (
         PARTITION BY ticker 
         ORDER BY date 
         ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
     ) as sma_20,
     
-    -- 50-day SMA
+    -- 26-day SMA: Used in MACDEXT slow period
     AVG(adjusted_closing_price) OVER (
         PARTITION BY ticker 
         ORDER BY date 
-        ROWS BETWEEN 49 PRECEDING AND CURRENT ROW
-    ) as sma_50,
-    
-    -- 200-day SMA (long-term trend)
-    AVG(adjusted_closing_price) OVER (
-        PARTITION BY ticker 
-        ORDER BY date 
-        ROWS BETWEEN 199 PRECEDING AND CURRENT ROW
-    ) as sma_200,
-    
-    -- Volume SMA for comparison
-    AVG(trading_volume) OVER (
-        PARTITION BY ticker 
-        ORDER BY date 
-        ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-    ) as volume_sma_20
+        ROWS BETWEEN 25 PRECEDING AND CURRENT ROW
+    ) as sma_26
 
 FROM {{ ref('stg_price_data') }}

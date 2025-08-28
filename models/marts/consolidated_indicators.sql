@@ -10,7 +10,7 @@ WITH sma_data AS (
         dividend_paid, common_shares_outstanding, last_closing_price,
         adjusted_closing_price, highest_price, lowest_price, opening_price,
         trading_volume, daily_range, daily_return_pct,
-        sma_5, sma_10, sma_20, sma_50, sma_200, volume_sma_20
+        sma_9, sma_12, sma_20, sma_26
     FROM {{ ref('int_sma_indicators') }}
     {% if is_incremental() %}
       WHERE date > (SELECT MAX(date) FROM {{ this }})
@@ -28,7 +28,7 @@ ema_data AS (
 rsi_data AS (
     SELECT 
         ticker, date,
-        rsi_7, rsi_14, rsi_21, price_change
+        rsi_14, price_change
     FROM {{ ref('int_rsi_indicators') }}
     {% if is_incremental() %}
       WHERE date > (SELECT MAX(date) FROM {{ this }})
@@ -37,7 +37,10 @@ rsi_data AS (
 macd_data AS (
     SELECT 
         ticker, date,
-        macd_line, macd_signal, macd_histogram, macd_percentage
+        -- Standard MACD
+        macd_line, macd_signal, macd_histogram, macd_percentage,
+        -- MACDEXT (matching Python script exactly)
+        macdext_line, macdext_signal
     FROM {{ ref('int_macd_indicators') }}
     {% if is_incremental() %}
       WHERE date > (SELECT MAX(date) FROM {{ this }})
@@ -46,7 +49,7 @@ macd_data AS (
 bb_data AS (
     SELECT 
         ticker, date,
-        bb_upper_20, bb_middle_20, bb_lower_20, bb_width_20, bb_percent_b_20
+        bb_upper_20, bb_middle_20, bb_lower_20
     FROM {{ ref('int_bollinger_bands') }}
     {% if is_incremental() %}
       WHERE date > (SELECT MAX(date) FROM {{ this }})
@@ -55,8 +58,17 @@ bb_data AS (
 vwap_data AS (
     SELECT 
         ticker, date,
-        vwap_cumulative, vwap_20, volume_ratio_20, price_vs_vwap_pct
+        vwap_cumulative
     FROM {{ ref('int_vwap_indicators') }}
+    {% if is_incremental() %}
+      WHERE date > (SELECT MAX(date) FROM {{ this }})
+    {% endif %}
+),
+dema_tema_data AS (
+    SELECT 
+        ticker, date,
+        dema_10, tema_10
+    FROM {{ ref('int_dema_tema_indicators') }}
     {% if is_incremental() %}
       WHERE date > (SELECT MAX(date) FROM {{ this }})
     {% endif %}
@@ -81,12 +93,10 @@ SELECT
     s.daily_return_pct,
     
     -- SMA indicators
-    s.sma_5,
-    s.sma_10,
+    s.sma_9,
+    s.sma_12,
     s.sma_20,
-    s.sma_50,
-    s.sma_200,
-    s.volume_sma_20,
+    s.sma_26,
     
     -- EMA indicators
     e.ema_5,
@@ -97,9 +107,7 @@ SELECT
     e.ema_50,
     
     -- RSI indicators
-    r.rsi_7,
     r.rsi_14,
-    r.rsi_21,
     r.price_change,
     
     -- MACD indicators
@@ -108,18 +116,21 @@ SELECT
     m.macd_histogram,
     m.macd_percentage,
     
+    -- MACDEXT (matching Python script exactly)
+    m.macdext_line,
+    m.macdext_signal,
+    
     -- Bollinger Bands
     bb.bb_upper_20,
     bb.bb_middle_20,
     bb.bb_lower_20,
-    bb.bb_width_20,
-    bb.bb_percent_b_20,
     
     -- VWAP indicators
     v.vwap_cumulative,
-    v.vwap_20,
-    v.volume_ratio_20,
-    v.price_vs_vwap_pct,
+    
+    -- DEMA and TEMA indicators (matching Python script exactly)
+    dt.dema_10,
+    dt.tema_10,
     
     -- Additional derived indicators
     -- Price vs moving averages
@@ -135,8 +146,8 @@ SELECT
     
     -- Moving average crossovers
     CASE 
-        WHEN s.sma_20 > s.sma_50 THEN 1
-        WHEN s.sma_20 < s.sma_50 THEN -1
+        WHEN s.sma_12 > s.sma_26 THEN 1
+        WHEN s.sma_12 < s.sma_26 THEN -1
         ELSE 0
     END as sma_crossover_signal,
     
@@ -180,6 +191,7 @@ LEFT JOIN rsi_data r ON s.ticker = r.ticker AND s.date = r.date
 LEFT JOIN macd_data m ON s.ticker = m.ticker AND s.date = m.date
 LEFT JOIN bb_data bb ON s.ticker = bb.ticker AND s.date = bb.date
 LEFT JOIN vwap_data v ON s.ticker = v.ticker AND s.date = v.date
+LEFT JOIN dema_tema_data dt ON s.ticker = dt.ticker AND s.date = dt.date
 
 ORDER BY s.ticker, s.date
 

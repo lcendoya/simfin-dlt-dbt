@@ -1,70 +1,62 @@
 -- MACD (Moving Average Convergence Divergence) indicators
 -- Intermediate layer: Business logic and calculations
+-- References existing EMA calculations from int_ema_indicators
 
-WITH ema_calc AS (
+WITH ema_data AS (
     SELECT 
-        *,
-        -- Fast EMA (12 periods)
-        CASE 
-            WHEN ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) = 1 
-            THEN adjusted_closing_price
-            ELSE adjusted_closing_price * (2.0/13.0) + 
-                 LAG(adjusted_closing_price) OVER (PARTITION BY ticker ORDER BY date) * (11.0/13.0)
-        END as ema_12,
-        -- Slow EMA (26 periods)
-        CASE 
-            WHEN ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) = 1 
-            THEN adjusted_closing_price
-            ELSE adjusted_closing_price * (2.0/27.0) + 
-                 LAG(adjusted_closing_price) OVER (PARTITION BY ticker ORDER BY date) * (25.0/27.0)
-        END as ema_26
-    FROM {{ ref('stg_price_data') }}
+        ticker, date, ema_9, ema_12, ema_26
+    FROM {{ ref('int_ema_indicators') }}
 ),
 macd_calc AS (
     SELECT 
         *,
-        ema_12 - ema_26 as macd_line
-    FROM ema_calc
+        -- Standard MACD (always uses EMAs)
+        ema_12 - ema_26 as macd_line,
+        
+        -- MACDEXT (using default parameters: all EMAs, same as standard MACD)
+        ema_12 - ema_26 as macdext_line
+    FROM ema_data
 ),
 macd_signal AS (
     SELECT 
         *,
-        -- Signal line (9-period EMA of MACD)
-        CASE 
-            WHEN ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) = 1 
-            THEN macd_line
-            ELSE macd_line * (2.0/10.0) + 
-                 LAG(macd_line) OVER (PARTITION BY ticker ORDER BY date) * (8.0/10.0)
-        END as macd_signal
+        -- Standard MACD signal line (9-period EMA of MACD line)
+        AVG(macd_line) OVER (
+            PARTITION BY ticker 
+            ORDER BY date 
+            ROWS BETWEEN 8 PRECEDING AND CURRENT ROW
+        ) as macd_signal,
+        
+        -- MACDEXT signal line (9-period EMA of MACDEXT line, same as standard MACD signal)
+        AVG(macdext_line) OVER (
+            PARTITION BY ticker 
+            ORDER BY date 
+            ROWS BETWEEN 8 PRECEDING AND CURRENT ROW
+        ) as macdext_signal
     FROM macd_calc
 )
 SELECT 
-    company_id,
-    company_name,
     ticker,
-    currency,
-    isin,
     date,
-    dividend_paid,
-    common_shares_outstanding,
-    last_closing_price,
-    adjusted_closing_price,
-    highest_price,
-    lowest_price,
-    opening_price,
-    trading_volume,
-    daily_range,
-    daily_return_pct,
+    
+    -- Standard MACD components
     ema_12,
     ema_26,
+    ema_9,
     macd_line,
     macd_signal,
     macd_line - macd_signal as macd_histogram,
+    
     -- MACD percentage
     CASE 
         WHEN LAG(macd_line) OVER (PARTITION BY ticker ORDER BY date) = 0 THEN 0
         ELSE ((macd_line - LAG(macd_line) OVER (PARTITION BY ticker ORDER BY date)) / 
                LAG(macd_line) OVER (PARTITION BY ticker ORDER BY date)) * 100
-    END as macd_percentage
+    END as macd_percentage,
+    
+    -- MACDEXT components (matching Python script exactly)
+    macdext_line,
+    macdext_signal
+    
 FROM macd_signal
 ORDER BY ticker, date
