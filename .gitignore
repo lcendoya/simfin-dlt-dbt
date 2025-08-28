@@ -11,6 +11,8 @@ profiles.yml
 *.duckdb
 *.wal
 dbt_packages/
+target/
+simfin_schemas/
 api_requests.py
 IndicatorData.py
 logs/
