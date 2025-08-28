@@ -1,4 +1,4 @@
-{{ config(materialized='incremental', unique_key=['ticker', 'date']) }}
+
 
 -- Consolidated Technical Indicators
 -- Combines all calculated indicators into one comprehensive table
@@ -11,55 +11,55 @@ WITH sma_data AS (
         adjusted_closing_price, highest_price, lowest_price, opening_price,
         trading_volume, daily_range, daily_return_pct,
         sma_5, sma_10, sma_20, sma_50, sma_200, volume_sma_20
-    FROM {{ ref('int_sma_indicators') }}
-    {% if is_incremental() %}
-      WHERE date > (SELECT MAX(date) FROM {{ this }})
-    {% endif %}
+    FROM "postgres"."simfin_dbt"."int_sma_indicators"
+    
+      WHERE date > (SELECT MAX(date) FROM "postgres"."simfin_dbt"."consolidated_indicators")
+    
 ),
 ema_data AS (
     SELECT 
         ticker, date,
         ema_5, ema_10, ema_12, ema_20, ema_26, ema_50
-    FROM {{ ref('int_ema_indicators') }}
-    {% if is_incremental() %}
-      WHERE date > (SELECT MAX(date) FROM {{ this }})
-    {% endif %}
+    FROM "postgres"."simfin_dbt"."int_ema_indicators"
+    
+      WHERE date > (SELECT MAX(date) FROM "postgres"."simfin_dbt"."consolidated_indicators")
+    
 ),
 rsi_data AS (
     SELECT 
         ticker, date,
         rsi_7, rsi_14, rsi_21, price_change
-    FROM {{ ref('int_rsi_indicators') }}
-    {% if is_incremental() %}
-      WHERE date > (SELECT MAX(date) FROM {{ this }})
-    {% endif %}
+    FROM "postgres"."simfin_dbt"."int_rsi_indicators"
+    
+      WHERE date > (SELECT MAX(date) FROM "postgres"."simfin_dbt"."consolidated_indicators")
+    
 ),
 macd_data AS (
     SELECT 
         ticker, date,
         macd_line, macd_signal, macd_histogram, macd_percentage
-    FROM {{ ref('int_macd_indicators') }}
-    {% if is_incremental() %}
-      WHERE date > (SELECT MAX(date) FROM {{ this }})
-    {% endif %}
+    FROM "postgres"."simfin_dbt"."int_macd_indicators"
+    
+      WHERE date > (SELECT MAX(date) FROM "postgres"."simfin_dbt"."consolidated_indicators")
+    
 ),
 bb_data AS (
     SELECT 
         ticker, date,
         bb_upper_20, bb_middle_20, bb_lower_20, bb_width_20, bb_percent_b_20
-    FROM {{ ref('int_bollinger_bands') }}
-    {% if is_incremental() %}
-      WHERE date > (SELECT MAX(date) FROM {{ this }})
-    {% endif %}
+    FROM "postgres"."simfin_dbt"."int_bollinger_bands"
+    
+      WHERE date > (SELECT MAX(date) FROM "postgres"."simfin_dbt"."consolidated_indicators")
+    
 ),
 vwap_data AS (
     SELECT 
         ticker, date,
         vwap_cumulative, vwap_20, volume_ratio_20, price_vs_vwap_pct
-    FROM {{ ref('int_vwap_indicators') }}
-    {% if is_incremental() %}
-      WHERE date > (SELECT MAX(date) FROM {{ this }})
-    {% endif %}
+    FROM "postgres"."simfin_dbt"."int_vwap_indicators"
+    
+      WHERE date > (SELECT MAX(date) FROM "postgres"."simfin_dbt"."consolidated_indicators")
+    
 )
 SELECT 
     -- Base price data (from sma_data since it contains all base columns)

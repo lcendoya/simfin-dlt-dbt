@@ -4,11 +4,11 @@ postgres:
     dev:
       type: postgres
       host: localhost
-      user: your_username
-      password: your_password
-      port: 5432
-      dbname: your_database
-      schema: public
+      user: postgres
+      password: $:g6oZ!WZ_i6de<<8ehQ]LI5RYiP
+      port: 5434
+      dbname: postgres
+      schema: simfin_dbt
       threads: 4
       keepalives_idle: 0
       connect_timeout: 10

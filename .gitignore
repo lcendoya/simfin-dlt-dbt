@@ -1,5 +1,6 @@
 # ignore secrets, virtual environments and typical python compilation artifacts
 secrets.toml
+profiles.yml
 # ignore basic python artifacts
 .env
 .venv/
@@ -9,6 +10,7 @@ secrets.toml
 # ignore duckdb
 *.duckdb
 *.wal
+dbt_packages/
 api_requests.py
 IndicatorData.py
 logs/
