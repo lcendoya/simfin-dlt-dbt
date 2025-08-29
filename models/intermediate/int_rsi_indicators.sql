@@ -1,20 +1,23 @@
+{{ config(materialized='incremental', unique_key=['ticker', 'date']) }}
+
 -- RSI (Relative Strength Index) indicators
 -- Intermediate layer: Business logic and calculations
--- Only calculates RSI 14 to match Python script exactly
+-- Only calculates RSI for period 14 as used in IndicatorData.py
 
 WITH price_changes AS (
     SELECT 
         *,
-        adjusted_closing_price - LAG(adjusted_closing_price) OVER (
-            PARTITION BY ticker ORDER BY date
-        ) as price_change
+        -- Use existing price_change, handle NULL for first row
+        COALESCE(price_change, 0) as price_change_for_rsi
     FROM {{ ref('stg_price_data') }}
+    -- Note: RSI needs historical data for 14-day window calculations
+    -- Incremental filtering is handled at the final SELECT level
 ),
 rsi_calc AS (
     SELECT 
         *,
-        CASE WHEN price_change > 0 THEN price_change ELSE 0 END as gain,
-        CASE WHEN price_change < 0 THEN ABS(price_change) ELSE 0 END as loss
+        CASE WHEN price_change_for_rsi > 0 THEN price_change_for_rsi ELSE 0 END as gain,
+        CASE WHEN price_change_for_rsi < 0 THEN ABS(price_change_for_rsi) ELSE 0 END as loss
     FROM price_changes
 ),
 rsi_final AS (
@@ -57,4 +60,6 @@ SELECT
         ELSE 100 - (100 / (1 + (avg_gain_14 / avg_loss_14)))
     END as rsi_14
 FROM rsi_final
-ORDER BY ticker, date
+{% if is_incremental() %}
+  WHERE date > (SELECT MAX(date) FROM {{ this }})
+{% endif %}

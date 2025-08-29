@@ -1,3 +1,5 @@
+{{ config(materialized='table') }}
+
 -- Bollinger Bands indicators
 -- Intermediate layer: Business logic and calculations
 -- References existing SMA-20 from int_sma_indicators instead of recalculating
@@ -6,28 +8,45 @@ WITH sma_data AS (
     SELECT 
         ticker, date, sma_20
     FROM {{ ref('int_sma_indicators') }}
+    -- Note: Need full SMA data for proper joins
 ),
 bb_calc AS (
     SELECT 
-        *,
+        p.company_id,
+        p.company_name,
+        p.ticker,
+        p.currency,
+        p.isin,
+        p.date,
+        p.dividend_paid,
+        p.common_shares_outstanding,
+        p.last_closing_price,
+        p.adjusted_closing_price,
+        p.highest_price,
+        p.lowest_price,
+        p.opening_price,
+        p.trading_volume,
+        p.daily_range,
+        p.daily_return_pct,
         -- Use existing SMA-20 from int_sma_indicators
         s.sma_20 as bb_middle_20,
         
         -- Upper band (SMA-20 + 2 standard deviations)
-        s.sma_20 + (2 * STDDEV(adjusted_closing_price) OVER (
-            PARTITION BY ticker 
-            ORDER BY date 
+        s.sma_20 + (2 * STDDEV(p.adjusted_closing_price) OVER (
+            PARTITION BY p.ticker 
+            ORDER BY p.date 
             ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
         )) as bb_upper_20,
         
         -- Lower band (SMA-20 - 2 standard deviations)
-        s.sma_20 - (2 * STDDEV(adjusted_closing_price) OVER (
-            PARTITION BY ticker 
-            ORDER BY date 
+        s.sma_20 - (2 * STDDEV(p.adjusted_closing_price) OVER (
+            PARTITION BY p.ticker 
+            ORDER BY p.date 
             ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
         )) as bb_lower_20
     FROM {{ ref('stg_price_data') }} p
     LEFT JOIN sma_data s ON p.ticker = s.ticker AND p.date = s.date
+    -- Note: Need full price data for 20-day STDDEV calculations
 )
 SELECT 
     company_id,
@@ -50,4 +69,4 @@ SELECT
     bb_upper_20,
     bb_lower_20
 FROM bb_calc
-ORDER BY ticker, date
+

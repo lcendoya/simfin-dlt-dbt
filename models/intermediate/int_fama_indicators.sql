@@ -2,12 +2,10 @@
 -- Intermediate layer: Business logic and calculations
 -- Only calculates FAMA to match Python script exactly
 
-WITH price_data AS (
+WITH RECURSIVE price_data AS (
     SELECT 
         *,
-        ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) as rn,
-        -- Price change
-        adjusted_closing_price - LAG(adjusted_closing_price, 1) OVER (PARTITION BY ticker ORDER BY date) as price_change
+        ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) as rn
     FROM {{ ref('stg_price_data') }}
 ),
 fama_recursive AS (
@@ -25,8 +23,8 @@ fama_recursive AS (
         p.*,
         -- Update slow_limit: max(slow_limit, min(slow_limit * 1.5, 0.99))
         GREATEST(0.05, LEAST(m.slow_limit * 1.5, 0.99)) as slow_limit,
-        -- FAMA calculation: fama[i] = fama[i-1] + slow_limit * diff
-        m.fama_value + (GREATEST(0.05, LEAST(m.slow_limit * 1.5, 0.99)) * p.price_change) as fama_value
+        -- FAMA calculation: fama[i] = fama[i-1] + slow_limit * diff (using previous slow_limit)
+        m.fama_value + (m.slow_limit * p.price_change) as fama_value
     FROM price_data p
     INNER JOIN fama_recursive m ON p.ticker = m.ticker AND p.rn = m.rn + 1
 )
@@ -52,4 +50,3 @@ SELECT
     fama_value as fama
     
 FROM fama_recursive
-ORDER BY ticker, date

@@ -2,66 +2,79 @@
 -- Intermediate layer: Business logic and calculations
 -- References existing EMA-10 from int_ema_indicators and calculates derived indicators
 
-WITH ema_data AS (
+WITH RECURSIVE ema_data AS (
     SELECT 
-        ticker, date, ema_10
+        ticker, date, ema_10,
+        ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) as rn
     FROM {{ ref('int_ema_indicators') }}
 ),
-dema_tema_calc AS (
+ema_of_ema_recursive AS (
     SELECT 
-        *,
-        -- DEMA = 2 * EMA - EMA(EMA)
-        -- First calculate EMA of EMA-10
-        AVG(ema_10) OVER (
-            PARTITION BY ticker 
-            ORDER BY date 
-            ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-        ) as ema_of_ema_10,
-        
-        -- Then calculate DEMA: 2 * EMA_10 - EMA(EMA_10)
-        2 * ema_10 - AVG(ema_10) OVER (
-            PARTITION BY ticker 
-            ORDER BY date 
-            ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-        ) as dema_10
+        ticker, date, ema_10, rn,
+        -- Base case: first row gets the EMA_10 value
+        ema_10 as ema_of_ema_10
     FROM ema_data
-),
-tema_calc AS (
+    WHERE rn = 1
+    
+    UNION ALL
+    
     SELECT 
-        *,
-        -- TEMA = 3 * EMA - 3 * EMA(EMA) + EMA(EMA(EMA))
-        -- First calculate EMA of EMA of EMA-10
-        AVG(ema_of_ema_10) OVER (
-            PARTITION BY ticker 
-            ORDER BY date 
-            ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-        ) as ema_of_ema_of_ema_10,
+        e.ticker, e.date, e.ema_10, e.rn,
+        -- Recursive case: EMA[i] = alpha * current_value + (1-alpha) * previous_EMA
+        -- alpha = 2/(10+1) = 0.1818
+        0.1818 * e.ema_10 + 0.8182 * r.ema_of_ema_10 as ema_of_ema_10
+    FROM ema_data e
+    INNER JOIN ema_of_ema_recursive r ON e.ticker = r.ticker AND e.rn = r.rn + 1
+),
+ema_of_ema_of_ema_recursive AS (
+    SELECT 
+        ticker, date, ema_10, rn, ema_of_ema_10,
+        -- Base case: first row gets the EMA of EMA value
+        ema_of_ema_10 as ema_of_ema_of_ema_10
+    FROM ema_of_ema_recursive
+    WHERE rn = 1
+    
+    UNION ALL
+    
+    SELECT 
+        e.ticker, e.date, e.ema_10, e.rn, e.ema_of_ema_10,
+        -- Recursive case: EMA[i] = alpha * current_value + (1-alpha) * previous_EMA
+        -- alpha = 2/(10+1) = 0.1818
+        0.1818 * e.ema_of_ema_10 + 0.8182 * r.ema_of_ema_of_ema_10 as ema_of_ema_of_ema_10
+    FROM ema_of_ema_recursive e
+    INNER JOIN ema_of_ema_of_ema_recursive r ON e.ticker = r.ticker AND e.rn = r.rn + 1
+),
+dema_tema_final AS (
+    SELECT 
+        ticker, date,
+        -- DEMA = 2 * EMA - EMA(EMA)
+        2 * ema_10 - ema_of_ema_10 as dema_10,
         
-        -- Then calculate TEMA: 3 * EMA_10 - 3 * EMA(EMA_10) + EMA(EMA(EMA_10))
+        -- TEMA = 3 * EMA - 3 * EMA(EMA) + EMA(EMA(EMA))
         3 * ema_10 - 3 * ema_of_ema_10 + ema_of_ema_of_ema_10 as tema_10
-    FROM dema_tema_calc
+    FROM ema_of_ema_of_ema_recursive
 )
 SELECT 
-    company_id,
-    company_name,
-    ticker,
-    currency,
-    isin,
-    date,
-    dividend_paid,
-    common_shares_outstanding,
-    last_closing_price,
-    adjusted_closing_price,
-    highest_price,
-    lowest_price,
-    opening_price,
-    trading_volume,
-    daily_range,
-    daily_return_pct,
+    p.company_id,
+    p.company_name,
+    p.ticker,
+    p.currency,
+    p.isin,
+    p.date,
+    p.dividend_paid,
+    p.common_shares_outstanding,
+    p.last_closing_price,
+    p.adjusted_closing_price,
+    p.highest_price,
+    p.lowest_price,
+    p.opening_price,
+    p.trading_volume,
+    p.daily_range,
+    p.daily_return_pct,
     
     -- DEMA and TEMA indicators (matching Python script exactly)
-    dema_10,
-    tema_10
+    d.dema_10,
+    d.tema_10
     
-FROM tema_calc
-ORDER BY ticker, date
+FROM {{ ref('stg_price_data') }} p
+LEFT JOIN dema_tema_final d ON p.ticker = d.ticker AND p.date = d.date

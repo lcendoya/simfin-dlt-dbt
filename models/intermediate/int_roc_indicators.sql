@@ -13,4 +13,3 @@ SELECT
     END as roc_10
 
 FROM {{ ref('stg_price_data') }}
-ORDER BY ticker, date

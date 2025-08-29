@@ -12,4 +12,3 @@ SELECT
     END as bop
 
 FROM {{ ref('stg_price_data') }}
-ORDER BY ticker, date

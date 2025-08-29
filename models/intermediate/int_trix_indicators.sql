@@ -1,6 +1,6 @@
--- T3 (Triple Exponential Moving Average T3) indicators
+-- TRIX indicators
 -- Intermediate layer: Business logic and calculations
--- Only calculates T3 with period 5 and vfactor 0.7 to match Python script exactly
+-- Only calculates TRIX 15 to match Python script exactly
 
 WITH ema_data AS (
     SELECT 
@@ -10,33 +10,33 @@ WITH ema_data AS (
 ema1_calc AS (
     SELECT 
         *,
-        -- First EMA of EMA-10 (period 5)
-        AVG(ema_10) OVER (
+        -- First EMA of price (period 15)
+        AVG(adjusted_closing_price) OVER (
             PARTITION BY ticker 
             ORDER BY date 
-            ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+            ROWS BETWEEN 14 PRECEDING AND CURRENT ROW
         ) as ema1
-    FROM ema_data
+    FROM {{ ref('stg_price_data') }}
 ),
 ema2_calc AS (
     SELECT 
         *,
-        -- Second EMA of EMA of EMA-10 (period 5)
+        -- Second EMA of EMA1 (period 15)
         AVG(ema1) OVER (
             PARTITION BY ticker 
             ORDER BY date 
-            ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+            ROWS BETWEEN 14 PRECEDING AND CURRENT ROW
         ) as ema2
     FROM ema1_calc
 ),
 ema3_calc AS (
     SELECT 
         *,
-        -- Third EMA of EMA of EMA of EMA-10 (period 5)
+        -- Third EMA of EMA2 (period 15)
         AVG(ema2) OVER (
             PARTITION BY ticker 
             ORDER BY date 
-            ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+            ROWS BETWEEN 14 PRECEDING AND CURRENT ROW
         ) as ema3
     FROM ema2_calc
 )
@@ -58,13 +58,13 @@ SELECT
     p.daily_range,
     p.daily_return_pct,
     
-    -- T3 calculation (matching Python script exactly)
-    -- vfactor = 0.7, period = 5
-    -- c1 = -vfactor^3 = -0.343
-    -- c2 = 3*vfactor^2 + 3*vfactor^3 = 1.029
-    -- c3 = -6*vfactor^2 - 3*vfactor - 3*vfactor^3 = -1.029
-    -- c4 = 1 + 3*vfactor + 3*vfactor^2 + vfactor^3 = 1.343
-    (-0.343 * ema3) + (1.029 * ema2) + (-1.029 * ema1) + (1.343 * p.adjusted_closing_price) as t3_5
+    -- TRIX calculation (matching Python script exactly)
+    -- TRIX = 100 * (ema3 - ema3_prev) / ema3_prev
+    CASE 
+        WHEN LAG(ema3, 1) OVER (PARTITION BY p.ticker ORDER BY p.date) = 0 THEN 0
+        ELSE 100 * (ema3 - LAG(ema3, 1) OVER (PARTITION BY p.ticker ORDER BY p.date)) / 
+             LAG(ema3, 1) OVER (PARTITION BY p.ticker ORDER BY p.date)
+    END as trix_15
     
 FROM {{ ref('stg_price_data') }} p
 LEFT JOIN ema3_calc e ON p.ticker = e.ticker AND p.date = e.date

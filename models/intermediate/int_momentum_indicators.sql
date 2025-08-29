@@ -11,4 +11,3 @@ SELECT
     ) as mom_10
 
 FROM {{ ref('stg_price_data') }}
-ORDER BY ticker, date

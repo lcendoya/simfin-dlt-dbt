@@ -24,4 +24,3 @@ SELECT
     ) as willr_14
 
 FROM {{ ref('stg_price_data') }}
-ORDER BY ticker, date

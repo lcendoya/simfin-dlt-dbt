@@ -2,12 +2,10 @@
 -- Intermediate layer: Business logic and calculations
 -- Only calculates MAMA to match Python script exactly
 
-WITH price_data AS (
+WITH RECURSIVE price_data AS (
     SELECT 
         *,
-        ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) as rn,
-        -- Price change
-        adjusted_closing_price - LAG(adjusted_closing_price, 1) OVER (PARTITION BY ticker ORDER BY date) as price_change
+        ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) as rn
     FROM {{ ref('stg_price_data') }}
 ),
 mama_recursive AS (
@@ -25,8 +23,8 @@ mama_recursive AS (
         p.*,
         -- Update fast_limit: max(slow_limit, min(fast_limit * 1.5, 0.99))
         GREATEST(0.05, LEAST(m.fast_limit * 1.5, 0.99)) as fast_limit,
-        -- MAMA calculation: mama[i] = mama[i-1] + fast_limit * diff
-        m.mama_value + (GREATEST(0.05, LEAST(m.fast_limit * 1.5, 0.99)) * p.price_change) as mama_value
+        -- MAMA calculation: mama[i] = mama[i-1] + fast_limit * diff (using previous fast_limit)
+        m.mama_value + (m.fast_limit * p.price_change) as mama_value
     FROM price_data p
     INNER JOIN mama_recursive m ON p.ticker = m.ticker AND p.rn = m.rn + 1
 )
@@ -52,4 +50,3 @@ SELECT
     mama_value as mama
     
 FROM mama_recursive
-ORDER BY ticker, date

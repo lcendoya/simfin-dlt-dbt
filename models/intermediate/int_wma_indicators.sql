@@ -18,4 +18,3 @@ SELECT
      1 * LAG(adjusted_closing_price, 9) OVER (PARTITION BY ticker ORDER BY date)) / 55 as wma_10
 
 FROM {{ ref('stg_price_data') }}
-ORDER BY ticker, date

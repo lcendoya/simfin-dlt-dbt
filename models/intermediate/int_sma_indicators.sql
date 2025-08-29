@@ -1,4 +1,6 @@
--- Simple Moving Average (SMA) indicators
+{{ config(materialized='incremental', unique_key=['ticker', 'date']) }}
+
+-- SMA (Simple Moving Average) indicators
 -- Intermediate layer: Business logic and calculations
 -- Only calculates SMA periods actually used in IndicatorData.py
 
@@ -33,3 +35,7 @@ SELECT
     ) as sma_26
 
 FROM {{ ref('stg_price_data') }}
+{% if is_incremental() %}
+  WHERE date > (SELECT MAX(date) FROM {{ this }})
+{% endif %}
+ORDER BY ticker, date
