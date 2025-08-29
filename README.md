@@ -1,6 +1,6 @@
-# Technical Indicators dbt Project
+# SimFin Technical Indicators Pipeline
 
-This dbt project transforms raw financial price data into comprehensive technical analysis indicators, converting the Python calculations from `IndicatorData.py` into optimized SQL transformations.
+This project implements a complete data pipeline using **dlt (data load tool)** to extract financial data from SimFin API and **dbt (data build tool)** to transform it into comprehensive technical analysis indicators. The main execution is handled by the Python pipeline script that orchestrates the entire data flow.
 
 ## Project Structure
 
